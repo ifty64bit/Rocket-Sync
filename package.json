@@ -1,13 +1,19 @@
 {
   "name": "rocket-sync",
   "version": "0.1.0",
+  "author": "ifty64bit",
+  "description": "nothing",
   "private": true,
+  "main": "public/electron.js",
+  "homepage": ".",
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "node-async-exec": "^1.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.3.0",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -15,7 +21,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "electron-dev": "electron .",
+    "electron-build": "electron-builder"
   },
   "eslintConfig": {
     "extends": [
@@ -34,5 +42,38 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.7",
+    "electron": "^19.0.10",
+    "electron-builder": "^23.1.0",
+    "postcss": "^8.4.14",
+    "tailwindcss": "^3.1.6"
+  },
+  "build": {
+    "productName": "Rocket Sync",
+    "appId": "com.ifty64bit.rocket-sync",
+    "asarUnpack": [
+      "build/adb"
+    ],
+    "icon": "build/icon.png",
+    "files": [
+      "build/**/*",
+      "package.json",
+      "*.js",
+      "public"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "rocket-sync.exe"
+    },
+    "directories": {
+      "output": "electron/output"
+    }
   }
 }

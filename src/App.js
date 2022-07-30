@@ -1,24 +1,17 @@
-import logo from './logo.svg';
-import './App.css';
-
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import Index from "./pages/Home";
+import Computer2Phone from "./pages/Computer2Phone";
+import Phone2Computer from "./pages/Phone2Computer";
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <>
+        <Routes>
+          <Route exact path="/" element={<Index />} />
+          <Route path="/computer2phone" element={<Computer2Phone />} />
+          <Route path="/phone2computer" element={<Phone2Computer />} />
+        </Routes>
+    </>
   );
 }
 
