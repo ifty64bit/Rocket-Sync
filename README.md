@@ -3,6 +3,7 @@
 ## What is This?
 
 This tool will help you to transfer data faster then conventional MTP method. (**USB Debugging Need to be enabled in developer mode**)
+This GUI tool built with Nodejs, Electron
 
 ## How it work?
 
