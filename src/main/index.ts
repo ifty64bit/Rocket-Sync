@@ -85,9 +85,17 @@ ipcMain.handle("say-hello", async (_, args) => {
 ipcMain.handle("getDevices", async (_, arg) => {
   try {
     const { stdout } = await execAsync(`"${getAdbPath()}" ${arg}`);
-    return stdout;
+    return JSON.stringify({ success: true, data: stdout, error: null });
   } catch (error: any) {
-    return error.message.split(":")[3] || error.message;
+    let errMsg = error.message;
+    if (errMsg.includes("unauthorized")) {
+      errMsg = "UNAUTHORIZED";
+    } else if (errMsg.includes("offline")) {
+      errMsg = "OFFLINE";
+    } else if (errMsg.includes("not found")) {
+      errMsg = "TIMEOUT";
+    }
+    return JSON.stringify({ success: false, data: null, error: errMsg });
   }
 });
 
@@ -115,10 +123,21 @@ ipcMain.handle(
       const { stdout } = await execAsync(
         `"${getAdbPath()}" push "${arg.path}\\${arg.fileName}" /sdcard`,
       );
-      return stdout;
+      if (stdout.includes("error") || stdout.includes("failed")) {
+        return JSON.stringify({
+          success: false,
+          data: null,
+          error: stdout.trim(),
+        });
+      }
+      return JSON.stringify({ success: true, data: stdout, error: null });
     } catch (error: any) {
       console.error(error);
-      return error.message;
+      return JSON.stringify({
+        success: false,
+        data: null,
+        error: error.message,
+      });
     }
   },
 );
@@ -126,10 +145,15 @@ ipcMain.handle(
 ipcMain.handle("get", async (_, arg) => {
   try {
     const { stdout } = await execAsync(`"${getAdbPath()}" ${arg}`);
-    return stdout;
+    return JSON.stringify({ success: true, data: stdout, error: null });
   } catch (error: any) {
     console.error(error);
-    return error.message;
+    let errMsg = error.message;
+    if (errMsg.includes("unauthorized")) errMsg = "UNAUTHORIZED";
+    else if (errMsg.includes("offline")) errMsg = "OFFLINE";
+    else if (errMsg.includes("not found")) errMsg = "TIMEOUT";
+
+    return JSON.stringify({ success: false, data: null, error: errMsg });
   }
 });
 
@@ -140,10 +164,21 @@ ipcMain.handle(
       const { stdout } = await execAsync(
         `"${getAdbPath()}" pull "sdcard/${arg.fileName}" "${arg.path}"`,
       );
-      return stdout;
+      if (stdout.includes("error") || stdout.includes("failed")) {
+        return JSON.stringify({
+          success: false,
+          data: null,
+          error: stdout.trim(),
+        });
+      }
+      return JSON.stringify({ success: true, data: stdout, error: null });
     } catch (error: any) {
       console.error(error);
-      return error.message;
+      return JSON.stringify({
+        success: false,
+        data: null,
+        error: error.message,
+      });
     }
   },
 );

@@ -9,6 +9,7 @@ import {
   MonitorDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import Checkbox from "../components/Checkbox";
 import Button from "../components/Button";
 
@@ -26,17 +27,28 @@ function Phone2Computer() {
 
   useEffect(() => {
     const getFileList = async () => {
-      const list = await window.signal.get("shell ls /sdcard");
-      const parsedList = list
-        .split("\r\n")
-        .slice(0, -1)
-        .filter(Boolean)
-        .map((e) => ({
-          path: e,
-          state: "pending" as const,
-          selected: true,
-        }));
-      setFiles(parsedList);
+      const listRaw = await window.signal.get("shell ls /sdcard");
+      try {
+        const result = JSON.parse(listRaw);
+        if (result.success) {
+          const parsedList = result.data
+            .split("\r\n")
+            .slice(0, -1)
+            .filter(Boolean)
+            .map((e) => ({
+              path: e,
+              state: "pending" as const,
+              selected: true,
+            }));
+          setFiles(parsedList);
+        } else {
+          toast.error(
+            "Failed to read device files. Did you grant USB permissions?",
+          );
+        }
+      } catch (e: any) {
+        toast.error("Unknown error parsing device storage.");
+      }
     };
     getFileList();
   }, []);
@@ -52,6 +64,9 @@ function Phone2Computer() {
   };
 
   const sendFile = async () => {
+    let successCount = 0;
+    let failCount = 0;
+
     for (let i = 0; i < files.length; i++) {
       if (files[i].selected) {
         setFiles((preState) =>
@@ -59,30 +74,45 @@ function Phone2Computer() {
             p.path === files[i].path ? { ...p, state: "moving" } : p,
           ),
         );
-        const result = await window.signal.pullFile({
+        const resultRaw = await window.signal.pullFile({
           fileName: files[i].path,
           path: savePath ? savePath : "",
         });
 
-        if (
-          result &&
-          result.includes("0 skipped") &&
-          !result.toLowerCase().includes("failed") &&
-          !result.toLowerCase().includes("error")
-        ) {
-          setFiles((preState) =>
-            preState.map((p) =>
-              p.path === files[i].path ? { ...p, state: "transfared" } : p,
-            ),
-          );
-        } else {
+        try {
+          const result = JSON.parse(resultRaw);
+          if (result.success) {
+            setFiles((preState) =>
+              preState.map((p) =>
+                p.path === files[i].path ? { ...p, state: "transfared" } : p,
+              ),
+            );
+            successCount++;
+          } else {
+            console.error(result.error);
+            setFiles((preState) =>
+              preState.map((p) =>
+                p.path === files[i].path ? { ...p, state: "failed" } : p,
+              ),
+            );
+            failCount++;
+            toast.error(`Download failed: ${files[i].path.split("/").pop()}`);
+          }
+        } catch (e: any) {
           setFiles((preState) =>
             preState.map((p) =>
               p.path === files[i].path ? { ...p, state: "failed" } : p,
             ),
           );
+          failCount++;
         }
       }
+    }
+
+    if (successCount > 0 && failCount === 0) {
+      toast.success(`Successfully downloaded ${successCount} items!`);
+    } else if (successCount > 0 && failCount > 0) {
+      toast.error(`Downloaded ${successCount} items. ${failCount} failed.`);
     }
   };
 

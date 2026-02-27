@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import Button from "../components/Button";
 import Checkbox from "../components/Checkbox";
 
@@ -48,6 +49,9 @@ function Computer2Phone() {
   };
 
   const sendFile = async () => {
+    let successCount = 0;
+    let failCount = 0;
+
     for (let i = 0; i < files.length; i++) {
       if (files[i].selected) {
         setFiles((preState) =>
@@ -56,30 +60,48 @@ function Computer2Phone() {
           ),
         );
 
-        let result = await window.signal.sendFile({
+        let resultRaw = await window.signal.sendFile({
           path: path,
           fileName: files[i].path,
         });
 
-        if (
-          result &&
-          result.includes("0 skipped") &&
-          !result.toLowerCase().includes("failed") &&
-          !result.toLowerCase().includes("error")
-        ) {
-          setFiles((preState) =>
-            preState.map((p) =>
-              p.path === files[i].path ? { ...p, state: "transfared" } : p,
-            ),
-          );
-        } else {
+        try {
+          let result = JSON.parse(resultRaw);
+          if (result.success) {
+            setFiles((preState) =>
+              preState.map((p) =>
+                p.path === files[i].path ? { ...p, state: "transfared" } : p,
+              ),
+            );
+            successCount++;
+          } else {
+            console.error(result.error);
+            setFiles((preState) =>
+              preState.map((p) =>
+                p.path === files[i].path ? { ...p, state: "failed" } : p,
+              ),
+            );
+            failCount++;
+            toast.error(
+              `Transfer failed for ${files[i].path.split("\\").pop()}`,
+            );
+          }
+        } catch (e) {
           setFiles((preState) =>
             preState.map((p) =>
               p.path === files[i].path ? { ...p, state: "failed" } : p,
             ),
           );
+          failCount++;
+          toast.error(`Transfer failed: Unexpected ADB response.`);
         }
       }
+    }
+
+    if (successCount > 0 && failCount === 0) {
+      toast.success(`Successfully transferred ${successCount} items!`);
+    } else if (successCount > 0 && failCount > 0) {
+      toast.error(`Transferred ${successCount} items. ${failCount} failed.`);
     }
   };
 

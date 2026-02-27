@@ -1,4 +1,4 @@
-import React from "react";
+import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import "./assets/index.css";
@@ -8,9 +8,9 @@ const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
 root.render(
-  <React.StrictMode>
-    <MemoryRouter>
-      <App />
+  <StrictMode>
+  <MemoryRouter>
+    <App />
     </MemoryRouter>
-  </React.StrictMode>,
+  </StrictMode>,
 );

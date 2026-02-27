@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Computer2Phone from "./pages/Computer2Phone";
 import Phone2Computer from "./pages/Phone2Computer";
+import AppToaster from "./components/Toaster";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <Route path="/computer2phone" element={<Computer2Phone />} />
         <Route path="/phone2computer" element={<Phone2Computer />} />
       </Routes>
+      <AppToaster />
     </div>
   );
 }
