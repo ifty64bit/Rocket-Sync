@@ -11,6 +11,11 @@ const api = {
   pullFile: (arg: { fileName: string; path: string }) =>
     ipcRenderer.invoke("pullFile", arg),
   get: (arg: string) => ipcRenderer.invoke("get", arg),
+  onProgress: (
+    callback: (data: { fileName: string; progress: number }) => void,
+  ) => {
+    ipcRenderer.on("transfer-progress", (_, data) => callback(data));
+  },
 };
 
 if (process.contextIsolated) {

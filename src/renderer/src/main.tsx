@@ -9,8 +9,8 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <StrictMode>
-  <MemoryRouter>
-    <App />
+    <MemoryRouter>
+      <App />
     </MemoryRouter>
   </StrictMode>,
 );

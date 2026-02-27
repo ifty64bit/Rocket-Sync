@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
@@ -118,27 +118,87 @@ ipcMain.handle("getAllinPath", async (_, arg) => {
 
 ipcMain.handle(
   "sendFile",
-  async (_, arg: { path: string; fileName: string }) => {
+  async (event, arg: { path: string; fileName: string }) => {
+    let fileSizeMB = 0;
     try {
-      const { stdout } = await execAsync(
-        `"${getAdbPath()}" push "${arg.path}\\${arg.fileName}" /sdcard`,
-      );
-      if (stdout.includes("error") || stdout.includes("failed")) {
-        return JSON.stringify({
-          success: false,
-          data: null,
-          error: stdout.trim(),
-        });
-      }
-      return JSON.stringify({ success: true, data: stdout, error: null });
-    } catch (error: any) {
-      console.error(error);
-      return JSON.stringify({
-        success: false,
-        data: null,
-        error: error.message,
-      });
+      const { statSync } = require("fs");
+      const { join } = require("path");
+      const stats = statSync(join(arg.path, arg.fileName));
+      fileSizeMB = stats.size / (1024 * 1024);
+    } catch (e) {
+      // ignore
     }
+
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const adbProcess = spawn(getAdbPath(), [
+        "push",
+        "-p",
+        `${arg.path}\\${arg.fileName}`,
+        "/sdcard",
+      ]);
+
+      let fullStdout = "";
+      let fullStderr = "";
+
+      const progressInterval = setInterval(async () => {
+        if (fileSizeMB > 0) {
+          try {
+            // For pushing, we poll the Android filesystem size
+            const { stdout: statOut } = await execAsync(
+              `"${getAdbPath()}" shell stat -c %s "/sdcard/${arg.fileName}"`,
+            );
+            const sizeBytes = parseInt(statOut.trim(), 10);
+            if (!isNaN(sizeBytes)) {
+              const currentMB = sizeBytes / (1024 * 1024);
+              const progress = Math.min(
+                Math.round((currentMB / fileSizeMB) * 100),
+                100,
+              );
+              const elapsedSec = Math.max((Date.now() - startTime) / 1000, 0.1);
+              const speedStr = (currentMB / elapsedSec).toFixed(1) + " MB/s";
+
+              event.sender.send("transfer-progress", {
+                fileName: arg.fileName,
+                progress: progress,
+                speed: speedStr,
+              });
+            }
+          } catch (e) {
+            // file might not exist on device yet
+          }
+        }
+      }, 500);
+
+      adbProcess.stdout.on("data", (data) => {
+        const text = data.toString();
+        fullStdout += text;
+      });
+
+      adbProcess.stderr.on("data", (data) => {
+        fullStderr += data.toString();
+      });
+
+      adbProcess.on("close", (code) => {
+        clearInterval(progressInterval);
+        if (
+          code !== 0 ||
+          fullStdout.includes("error") ||
+          fullStdout.includes("failed") ||
+          fullStderr.includes("error")
+        ) {
+          const errMsg =
+            fullStderr.trim() || fullStdout.trim() || "Unknown Error";
+          resolve(
+            JSON.stringify({ success: false, data: null, error: errMsg }),
+          );
+        } else {
+          resolve(
+            JSON.stringify({ success: true, data: fullStdout, error: null }),
+          );
+        }
+      });
+    });
   },
 );
 
@@ -159,26 +219,89 @@ ipcMain.handle("get", async (_, arg) => {
 
 ipcMain.handle(
   "pullFile",
-  async (_, arg: { fileName: string; path: string }) => {
+  async (event, arg: { fileName: string; path: string }) => {
+    let fileSizeMB = 0;
     try {
-      const { stdout } = await execAsync(
-        `"${getAdbPath()}" pull "sdcard/${arg.fileName}" "${arg.path}"`,
+      const { stdout: statOut } = await execAsync(
+        `"${getAdbPath()}" shell stat -c %s "/sdcard/${arg.fileName}"`,
       );
-      if (stdout.includes("error") || stdout.includes("failed")) {
-        return JSON.stringify({
-          success: false,
-          data: null,
-          error: stdout.trim(),
-        });
+      const sizeBytes = parseInt(statOut.trim(), 10);
+      if (!isNaN(sizeBytes)) {
+        fileSizeMB = sizeBytes / (1024 * 1024);
       }
-      return JSON.stringify({ success: true, data: stdout, error: null });
-    } catch (error: any) {
-      console.error(error);
-      return JSON.stringify({
-        success: false,
-        data: null,
-        error: error.message,
-      });
+    } catch (e) {
+      // ignore stat fetch error
     }
+
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const adbProcess = spawn(getAdbPath(), [
+        "pull",
+        "-a",
+        "-p",
+        `sdcard/${arg.fileName}`,
+        arg.path,
+      ]);
+
+      let fullStdout = "";
+      let fullStderr = "";
+
+      const progressInterval = setInterval(() => {
+        if (fileSizeMB > 0) {
+          try {
+            // For pulling, we poll the local filesystem size
+            const { statSync } = require("fs");
+            const { join } = require("path");
+            const stats = statSync(
+              join(arg.path, arg.fileName.split("/").pop() || arg.fileName),
+            );
+            const currentMB = stats.size / (1024 * 1024);
+            const progress = Math.min(
+              Math.round((currentMB / fileSizeMB) * 100),
+              100,
+            );
+            const elapsedSec = Math.max((Date.now() - startTime) / 1000, 0.1);
+            const speedStr = (currentMB / elapsedSec).toFixed(1) + " MB/s";
+
+            event.sender.send("transfer-progress", {
+              fileName: arg.fileName,
+              progress: progress,
+              speed: speedStr,
+            });
+          } catch (e) {
+            // file might not be written on PC yet
+          }
+        }
+      }, 500);
+
+      adbProcess.stdout.on("data", (data) => {
+        const text = data.toString();
+        fullStdout += text;
+      });
+
+      adbProcess.stderr.on("data", (data) => {
+        fullStderr += data.toString();
+      });
+
+      adbProcess.on("close", (code) => {
+        clearInterval(progressInterval);
+        if (
+          code !== 0 ||
+          fullStdout.includes("error") ||
+          fullStdout.includes("failed") ||
+          fullStderr.includes("error")
+        ) {
+          const errMsg =
+            fullStderr.trim() || fullStdout.trim() || "Unknown Error";
+          resolve(
+            JSON.stringify({ success: false, data: null, error: errMsg }),
+          );
+        } else {
+          resolve(
+            JSON.stringify({ success: true, data: fullStdout, error: null }),
+          );
+        }
+      });
+    });
   },
 );

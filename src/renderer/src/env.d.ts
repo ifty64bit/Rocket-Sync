@@ -9,6 +9,9 @@ interface SignalAPI {
   sendFile: (arg: { path: string; fileName: string }) => Promise<string>;
   pullFile: (arg: { fileName: string; path: string }) => Promise<string>;
   get: (arg: string) => Promise<string>;
+  onProgress: (
+    callback: (data: { fileName: string; progress: number }) => void,
+  ) => void;
 }
 
 declare global {

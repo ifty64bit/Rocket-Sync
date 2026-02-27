@@ -16,6 +16,7 @@ interface FileItem {
   path: string;
   state: "pending" | "moving" | "transfared" | "failed";
   selected: boolean;
+  progress?: number;
 }
 
 function Computer2Phone() {
@@ -23,6 +24,18 @@ function Computer2Phone() {
   const [path, setPath] = useState<string>("");
   const [selectAll, setSelectAll] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.signal.onProgress((data) => {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.path.includes(data.fileName)
+            ? { ...f, progress: data.progress }
+            : f,
+        ),
+      );
+    });
+  }, []);
 
   useEffect(() => {
     if (path === "") return;
@@ -41,6 +54,14 @@ function Computer2Phone() {
   const updateAllSelected = () => {
     setFiles(files.map((file) => ({ ...file, selected: !selectAll })));
     setSelectAll(!selectAll);
+  };
+
+  const toggleFileSelection = (index: number) => {
+    setFiles((prevFiles) =>
+      prevFiles.map((file, i) =>
+        i === index ? { ...file, selected: !file.selected } : file,
+      ),
+    );
   };
 
   const openFolder = async () => {
@@ -178,42 +199,71 @@ function Computer2Phone() {
                       transition={{ delay: index * 0.05 }}
                       key={f.path}
                       className={`
-                        flex items-center justify-between p-4 rounded-xl transition-all duration-300
+                        relative flex items-center justify-between p-4 rounded-xl transition-all duration-300 overflow-hidden
                         ${f.state === "transfared" ? "bg-emerald-900/20 border-emerald-500/30 border" : ""}
                         ${f.state === "moving" ? "bg-primary-900/30 border-primary-500/50 border shadow-[0_0_15px_rgba(34,197,94,0.2)]" : ""}
                         ${f.state === "failed" ? "bg-red-900/20 border-red-500/30 border" : ""}
                         ${f.state === "pending" ? "bg-slate-800/50 hover:bg-slate-700/50 border-transparent hover:border-slate-600 border" : ""}
                       `}
                     >
-                      <div className="flex items-center gap-4 truncate">
-                        <Checkbox setFiles={setFiles} value={f} />
-                        <span
-                          className="font-mono text-sm tracking-wide truncate max-w-sm"
-                          title={f.path}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-lg ${
+                            f.state === "transfared"
+                              ? "bg-primary-500/20 text-primary-400"
+                              : f.state === "failed"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-slate-700/50 text-slate-300"
+                          }`}
                         >
-                          {f.path.split("/").pop()}
+                          {f.state === "moving" ? (
+                            <Loader2 className="animate-spin" size={20} />
+                          ) : f.state === "transfared" ? (
+                            <ShieldCheck size={20} />
+                          ) : f.state === "failed" ? (
+                            <ShieldAlert size={20} />
+                          ) : (
+                            <Smartphone size={20} />
+                          )}
+                        </div>
+                        <span
+                          className={`font-medium ${f.state === "transfared" ? "text-slate-200" : "text-slate-400"}`}
+                        >
+                          {f.path.split("\\").pop()}
                         </span>
                       </div>
 
-                      <div className="flex items-center w-10 justify-end">
-                        {f.state === "transfared" && (
-                          <ShieldCheck className="text-emerald-400" size={24} />
-                        )}
-                        {f.state === "moving" && (
-                          <Loader2
-                            className="animate-spin text-primary-400"
-                            size={24}
-                          />
-                        )}
-                        {f.state === "failed" && (
-                          <ShieldAlert className="text-red-400" size={24} />
-                        )}
-                        {f.state === "pending" && (
-                          <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                            Pending
+                      <div className="flex items-center gap-4">
+                        {f.state === "moving" && f.progress !== undefined && (
+                          <span className="text-xs font-semibold tracking-wider text-primary-400">
+                            {f.progress}%
                           </span>
                         )}
+                        <Checkbox
+                          checked={f.selected}
+                          onChange={() => toggleFileSelection(index)}
+                          disabled={f.state === "moving"}
+                        />
                       </div>
+
+                      {/* Progress Bar */}
+                      {(f.state === "moving" ||
+                        f.state === "transfared" ||
+                        f.state === "failed") && (
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-800/50">
+                          <motion.div
+                            className={`h-full ${f.state === "failed" ? "bg-red-500" : "bg-primary-500"}`}
+                            initial={{ width: 0 }}
+                            animate={{
+                              width:
+                                f.state === "transfared"
+                                  ? "100%"
+                                  : `${f.progress || 0}%`,
+                            }}
+                            transition={{ ease: "linear", duration: 0.3 }}
+                          />
+                        </div>
+                      )}
                     </motion.div>
                   );
                 })}

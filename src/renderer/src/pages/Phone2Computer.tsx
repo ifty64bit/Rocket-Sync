@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HardDriveDownload,
-  Download,
   Loader2,
   ShieldCheck,
   ShieldAlert,
@@ -17,6 +16,7 @@ interface FileItem {
   path: string;
   state: "pending" | "moving" | "transfared" | "failed";
   selected: boolean;
+  progress?: number;
 }
 
 function Phone2Computer() {
@@ -24,6 +24,18 @@ function Phone2Computer() {
   const [savePath, setSavePath] = useState<string>("");
   const [selectAll, setSelectAll] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.signal.onProgress((data) => {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.path.includes(data.fileName)
+            ? { ...f, progress: data.progress }
+            : f,
+        ),
+      );
+    });
+  }, []);
 
   useEffect(() => {
     const getFileList = async () => {
@@ -35,7 +47,7 @@ function Phone2Computer() {
             .split("\r\n")
             .slice(0, -1)
             .filter(Boolean)
-            .map((e) => ({
+            .map((e: string) => ({
               path: e,
               state: "pending" as const,
               selected: true,
@@ -61,6 +73,14 @@ function Phone2Computer() {
   const updateAllSelected = () => {
     setFiles(files.map((file) => ({ ...file, selected: !selectAll })));
     setSelectAll(!selectAll);
+  };
+
+  const toggleFileSelection = (index: number) => {
+    setFiles((prevFiles) =>
+      prevFiles.map((file, i) =>
+        i === index ? { ...file, selected: !file.selected } : file,
+      ),
+    );
   };
 
   const sendFile = async () => {
@@ -209,34 +229,64 @@ function Phone2Computer() {
                       `}
                     >
                       <div className="flex items-center gap-4 truncate">
-                        <Checkbox setFiles={setFiles} value={f} />
+                        <div
+                          className={`p-2 rounded-lg ${
+                            f.state === "transfared"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : f.state === "failed"
+                                ? "bg-red-500/20 text-red-400"
+                                : "bg-slate-700/50 text-slate-300"
+                          }`}
+                        >
+                          {f.state === "moving" ? (
+                            <Loader2 className="animate-spin" size={20} />
+                          ) : f.state === "transfared" ? (
+                            <ShieldCheck size={20} />
+                          ) : f.state === "failed" ? (
+                            <ShieldAlert size={20} />
+                          ) : (
+                            <MonitorDown size={20} />
+                          )}
+                        </div>
                         <span
-                          className="font-mono text-sm tracking-wide truncate max-w-sm"
+                          className={`font-mono text-sm tracking-wide truncate max-w-sm ${f.state === "transfared" ? "text-slate-200" : "text-slate-400"}`}
                           title={f.path}
                         >
                           {f.path.split("/").pop()}
                         </span>
                       </div>
 
-                      <div className="flex items-center w-10 justify-end">
-                        {f.state === "transfared" && (
-                          <ShieldCheck className="text-emerald-400" size={24} />
-                        )}
-                        {f.state === "moving" && (
-                          <Download
-                            className="animate-bounce text-emerald-400"
-                            size={24}
-                          />
-                        )}
-                        {f.state === "failed" && (
-                          <ShieldAlert className="text-red-400" size={24} />
-                        )}
-                        {f.state === "pending" && (
-                          <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-                            Pending
+                      <div className="flex items-center gap-4">
+                        {f.state === "moving" && f.progress !== undefined && (
+                          <span className="text-xs font-semibold tracking-wider text-emerald-400">
+                            {f.progress}%
                           </span>
                         )}
+                        <Checkbox
+                          checked={f.selected}
+                          onChange={() => toggleFileSelection(index)}
+                          disabled={f.state === "moving"}
+                        />
                       </div>
+
+                      {/* Progress Bar */}
+                      {(f.state === "moving" ||
+                        f.state === "transfared" ||
+                        f.state === "failed") && (
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-800/50">
+                          <motion.div
+                            className={`h-full ${f.state === "failed" ? "bg-red-500" : "bg-emerald-500"}`}
+                            initial={{ width: 0 }}
+                            animate={{
+                              width:
+                                f.state === "transfared"
+                                  ? "100%"
+                                  : `${f.progress || 0}%`,
+                            }}
+                            transition={{ ease: "linear", duration: 0.3 }}
+                          />
+                        </div>
+                      )}
                     </motion.div>
                   );
                 })}
