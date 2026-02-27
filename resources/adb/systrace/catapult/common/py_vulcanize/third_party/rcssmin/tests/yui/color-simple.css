@@ -1,0 +1,9 @@
+.foo,
+#AABBCC {
+  background-color: #aabbcc;
+  border-color: #ee66aa #abcdef #feab2c;
+  filter: chroma(color = #ffffff);
+  filter: chroma(color= "#AABBCC");
+  filter: chroma(color= "#BBDDEE");
+  color: #112233;
+}

@@ -1,0 +1,49 @@
+.color {
+  me: rgb(123, 123, 123);
+  impressed: #ffeedd;
+  again: #abcdef;
+  andagain: #aa66cc;
+  background-color: #aa66ccc;
+  filter: chroma(color= "#FFFFFF");
+  background: none repeat scroll 0 0 rgb(255, 0, 0);
+  alpha: rgba(1, 2, 3, 4);
+  color: #1122aa;
+}
+
+#AABBCC {
+  background-color: #ffee11;
+  filter: chroma(color = #ffffff);
+  color: #441122;
+  foo: #00ff11 #abc #aabbcc #123344;
+  border-color: #aa66ccC;
+}
+
+.foo #AABBCC {
+  background-color: #ffee11;
+  color: #441122;
+  border-color: #abc;
+  filter: chroma(color= #ffffff);
+}
+
+.bar,
+#AABBCC {
+  background-color: #ffee11;
+  border-color: #00ff11 #abcdef;
+  filter: chroma(color=#11FFFFFF);
+  color: #441122;
+}
+
+.foo,
+#AABBCC.foobar {
+  background-color: #ffee11;
+  border-color: #00ff11 #abcdef #aabbcc;
+  color: #441122;
+}
+
+@media screen {
+  .bar,
+  #AABBCC {
+    background-color: #ffee11;
+    color: #441122;
+  }
+}

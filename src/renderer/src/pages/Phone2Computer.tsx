@@ -1,0 +1,222 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  HardDriveDownload,
+  Download,
+  Loader2,
+  ShieldCheck,
+  ShieldAlert,
+  MonitorDown,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import Checkbox from "../components/Checkbox";
+import Button from "../components/Button";
+
+interface FileItem {
+  path: string;
+  state: "pending" | "moving" | "transfared" | "failed";
+  selected: boolean;
+}
+
+function Phone2Computer() {
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [savePath, setSavePath] = useState<string>("");
+  const [selectAll, setSelectAll] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const getFileList = async () => {
+      const list = await window.signal.get("shell ls /sdcard");
+      const parsedList = list
+        .split("\r\n")
+        .slice(0, -1)
+        .filter(Boolean)
+        .map((e) => ({
+          path: e,
+          state: "pending" as const,
+          selected: true,
+        }));
+      setFiles(parsedList);
+    };
+    getFileList();
+  }, []);
+
+  const updateFilePath = async () => {
+    const folderPath = await window.signal.openFolder();
+    if (folderPath) setSavePath(folderPath);
+  };
+
+  const updateAllSelected = () => {
+    setFiles(files.map((file) => ({ ...file, selected: !selectAll })));
+    setSelectAll(!selectAll);
+  };
+
+  const sendFile = async () => {
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].selected) {
+        setFiles((preState) =>
+          preState.map((p) =>
+            p.path === files[i].path ? { ...p, state: "moving" } : p,
+          ),
+        );
+        const result = await window.signal.pullFile({
+          fileName: files[i].path,
+          path: savePath ? savePath : "",
+        });
+
+        if (
+          result &&
+          result.includes("0 skipped") &&
+          !result.toLowerCase().includes("failed") &&
+          !result.toLowerCase().includes("error")
+        ) {
+          setFiles((preState) =>
+            preState.map((p) =>
+              p.path === files[i].path ? { ...p, state: "transfared" } : p,
+            ),
+          );
+        } else {
+          setFiles((preState) =>
+            preState.map((p) =>
+              p.path === files[i].path ? { ...p, state: "failed" } : p,
+            ),
+          );
+        }
+      }
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen max-w-4xl mx-auto overflow-hidden text-slate-100">
+      {/* Header */}
+      <div className="flex items-center justify-between px-8 py-6 glass border-b border-slate-700/50 shadow-md">
+        <div className="flex items-center gap-4">
+          <Button onClick={() => navigate(-1)} type="back" />
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
+            <MonitorDown className="text-emerald-400" /> Receive from Phone
+          </h1>
+        </div>
+      </div>
+
+      <div className="flex flex-col flex-1 p-8 overflow-hidden gap-6">
+        {/* Controls */}
+        <div className="flex gap-4">
+          <Button
+            onClick={updateFilePath}
+            text={savePath ? "Change Dest Folder" : "Select Dest Folder"}
+            type={savePath ? "secondary" : "receive"}
+            className="flex-1"
+          />
+          {files.length > 0 && (
+            <Button
+              onClick={sendFile}
+              disabled={!savePath}
+              text="Download Selected"
+              type={savePath ? "receive" : "secondary"}
+              className={`flex-1 ${!savePath ? "opacity-50" : ""}`}
+            />
+          )}
+        </div>
+
+        {savePath && (
+          <div className="text-sm font-mono text-slate-400 truncate bg-slate-800/50 p-3 rounded-lg border border-slate-700 shadow-inner">
+            <span className="text-slate-500 select-none mr-2">Saving to:</span>
+            {savePath}
+          </div>
+        )}
+
+        {!savePath && (
+          <div className="text-sm text-amber-400/80 bg-amber-900/20 p-3 rounded-lg border border-amber-700/30 flex items-center gap-2">
+            Please select a destination folder before downloading.
+          </div>
+        )}
+
+        {/* File List */}
+        <div className="flex flex-col flex-1 overflow-hidden glass rounded-2xl border border-slate-700/50">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50 bg-slate-800/40">
+            <h2 className="font-medium text-slate-300 flex items-center gap-2">
+              <HardDriveDownload size={18} /> /sdcard contents
+            </h2>
+            {files.length > 0 && (
+              <label className="flex items-center gap-3 cursor-pointer select-none text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                <span className="uppercase tracking-wider font-semibold">
+                  Select All
+                </span>
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={updateAllSelected}
+                  className="w-5 h-5 rounded border-slate-600 bg-slate-700 accent-emerald-500 cursor-pointer"
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 relative">
+            {files.length === 0 ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900/10">
+                <Loader2
+                  size={48}
+                  className="mb-4 text-slate-600 animate-spin"
+                />
+                <p>Loading files from device...</p>
+              </div>
+            ) : (
+              <AnimatePresence>
+                {files.map((f, index) => {
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(index * 0.02, 0.5) }} // Cap massive list initial stagger
+                      key={f.path}
+                      className={`
+                        flex items-center justify-between p-4 rounded-xl transition-all duration-300
+                        ${f.state === "transfared" ? "bg-emerald-900/20 border-emerald-500/30 border" : ""}
+                        ${f.state === "moving" ? "bg-emerald-900/30 border-emerald-500/50 border shadow-[0_0_15px_rgba(16,185,129,0.2)]" : ""}
+                        ${f.state === "failed" ? "bg-red-900/20 border-red-500/30 border" : ""}
+                        ${f.state === "pending" ? "bg-slate-800/50 hover:bg-slate-700/50 border-transparent hover:border-slate-600 border" : ""}
+                      `}
+                    >
+                      <div className="flex items-center gap-4 truncate">
+                        <Checkbox setFiles={setFiles} value={f} />
+                        <span
+                          className="font-mono text-sm tracking-wide truncate max-w-sm"
+                          title={f.path}
+                        >
+                          {f.path.split("/").pop()}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center w-10 justify-end">
+                        {f.state === "transfared" && (
+                          <ShieldCheck className="text-emerald-400" size={24} />
+                        )}
+                        {f.state === "moving" && (
+                          <Download
+                            className="animate-bounce text-emerald-400"
+                            size={24}
+                          />
+                        )}
+                        {f.state === "failed" && (
+                          <ShieldAlert className="text-red-400" size={24} />
+                        )}
+                        {f.state === "pending" && (
+                          <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Phone2Computer;
